@@ -6,9 +6,10 @@ from oauth_mail.security.azure import AzureSecurityToken
 
 
 class GraphAPIMailBackend(BaseEmailBackend):
-    def __init__(self, host=None, save_sent_message=False):
+    def __init__(self, host=None, save_sent_message=False, fail_silently=False, **kwargs):
         self.host = settings.EMAIL_HOST_USER if host is None else host
         self.save_sent_message = save_sent_message
+        super().__init__(fail_silently=fail_silently)
 
     def send_messages(self, email_messages):
         """Method used to send messages and return the number of email messages sent"""
