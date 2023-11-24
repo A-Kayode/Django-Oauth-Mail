@@ -6,9 +6,9 @@ from oauth_mail.security.azure import AzureSecurityToken
 
 
 class GraphAPIMailBackend(BaseEmailBackend):
-    def __init__(self, host=None, save_sent_message=False, fail_silently=False, **kwargs):
+    def __init__(self, host=None, fail_silently=False, **kwargs):
         self.host = settings.EMAIL_HOST_USER if host is None else host
-        self.save_sent_message = save_sent_message
+        self.save_sent_message = settings.DJANGO_OAUTH_MAIL_SETTINGS['OUTLOOK']["save_to_sent_items"] if settings.DJANGO_OAUTH_MAIL_SETTINGS.get('OUTLOOK').get('save_to_sent_items') is not None else False
         super().__init__(fail_silently=fail_silently)
 
     def send_messages(self, email_messages):
@@ -18,24 +18,25 @@ class GraphAPIMailBackend(BaseEmailBackend):
 
         messages_sent = 0
         token = AzureSecurityToken.get_token()
-        headers = {"Content-Type":"application/json", "Authorization":f"Bearer {token}"}
-        for message in email_messages:
-            payload = {
-                "message": {
-                    "subject": message.subject,
-                    "body": {
-                        "content": message.body,
-                        "contentType": message.content_subtype if message.content_subtype == "html" else "text",
+        if token:
+            headers = {"Content-Type":"application/json", "Authorization":f"Bearer {token}"}
+            for message in email_messages:
+                payload = {
+                    "message": {
+                        "subject": message.subject,
+                        "body": {
+                            "content": message.body,
+                            "contentType": message.content_subtype if message.content_subtype == "html" else "text",
+                        },
+                        "toRecipients": [{"emailAddress": {"address": recipient}} for recipient in message.to],
+                        "bccRecipients": [{"emailAddress": {"address": bcc}} for bcc in message.bcc]
                     },
-                    "toRecipients": [{"emailAddress": {"address": recipient}} for recipient in message.to],
-                    "bccRecipients": [{"emailAddress": {"address": bcc}} for bcc in message.bcc]
-                },
-                "saveToSentItems": self.save_sent_message
-            }
-            response = requests.post(f"https://graph.microsoft.com/v1.0/users/{self.host}/sendMail", json=payload, headers=headers)
-            if response.status_code == 202:
-                messages_sent = messages_sent + 1
-        
+                    "saveToSentItems": self.save_sent_message
+                }
+                response = requests.post(f"https://graph.microsoft.com/v1.0/users/{self.host}/sendMail", json=payload, headers=headers)
+                if response.status_code == 202:
+                    messages_sent = messages_sent + 1
+            
         return messages_sent
             
         
